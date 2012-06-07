@@ -18,7 +18,7 @@ modify by yaoxinming@gmail.com
 for hdfs api
 */
 #include "hdfs_drv.h"
-
+#include "search.h"
 #define EFILE_MODE_READ       1
 #define EFILE_MODE_WRITE      2
 #define EFILE_MODE_READ_WRITE  3  
@@ -145,6 +145,7 @@ void run_hdfs(void *jsargs) {
       send_error_string_response(dd, call_data, call_id,result);
     }
     else {
+      // hdfsDisconnect(dd->fs);
       // dd->hdfs_drv=fs;
       send_ok_response(dd, call_data, call_id);
     }
@@ -220,8 +221,7 @@ void run_hdfs(void *jsargs) {
   }
   driver_free(command);
   driver_free(call_id);
-  if(result != NULL)
-    driver_free(result);
+  
 }
 
 static int init(void) {
@@ -233,6 +233,7 @@ static ErlDrvData hdfs_drv_start(ErlDrvPort port, char *cmd) {
   hdfs_drv_t *retval = (hdfs_drv_t*) driver_alloc((ErlDrvSizeT) sizeof(hdfs_drv_t));
   retval->port = port;
   retval->close = 0;
+  //  retval->return_type = call_return_string;
   retval->atom_ok = driver_mk_atom((char *) "ok");
   retval->atom_error = driver_mk_atom((char *) "error");
   retval->atom_unknown_cmd = driver_mk_atom((char *) "unknown_command");
@@ -241,7 +242,16 @@ static ErlDrvData hdfs_drv_start(ErlDrvPort port, char *cmd) {
 
 static void hdfs_drv_stop(ErlDrvData handle) {
   hdfs_drv_t *dd = (hdfs_drv_t*) handle;
-  driver_free(dd);
+  if(dd !=NULL){
+    
+     if(dd->close==0&&dd->fs!=NULL&&dd->hdfs_file!=NULL){//not close
+      hdfsCloseFile(dd->fs,dd->hdfs_file);
+     }
+    if(dd->fs!=NULL)
+      hdfsDisconnect(dd->fs);
+    driver_free(dd);
+    hdestroy();
+  }
 }
 
 static void hdfs_drv_process(ErlDrvData handle, ErlIOVec *ev) {
@@ -253,11 +263,12 @@ static void hdfs_drv_process(ErlDrvData handle, ErlIOVec *ev) {
   call_data->return_terms[0] = 0;
   call_data->return_term_count = 0;
   call_data->return_string = NULL;
+  call_data->return_type = call_return_string;
   driver_binary_inc_refc(call_data->args);
-    //ErlDrvPort port = dd->port;
-    //intptr_t port_ptr = (intptr_t) port;
-    //unsigned int thread_key = port_ptr;
-  driver_async(dd->port, NULL, (asyncfun) run_hdfs, (void *) call_data, NULL);
+   ErlDrvPort port = dd->port;
+   intptr_t port_ptr = (intptr_t) port;
+   unsigned int thread_key = port_ptr;
+  driver_async(dd->port, &thread_key, (asyncfun) run_hdfs, (void *) call_data, NULL);
  
  
 }

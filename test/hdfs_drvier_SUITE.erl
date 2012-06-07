@@ -26,7 +26,7 @@ end_per_testcase(Config)->
     ok.
 
 all()->
-    [stat].
+    [read_file,stat].
 
 read_file(Config)->
     Port=?config(port,Config),
